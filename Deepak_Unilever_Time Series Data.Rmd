@@ -1,0 +1,300 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+#REQUIRED PACKAGES
+packages = c('tseries','forecast','quantmod','car','FinTS','rugarch')
+install.packages(packages)
+#Load all packages
+lapply(packages, require, character.only = TRUE)
+#lapply(quantmod)
+
+
+
+```
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code.
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*.
+
+```{r}
+stock_data = new.env()
+stock_list = c('UL')
+start_date = as.Date('2015-01-01'); end_date = as.Date('2019-12-31')
+getSymbols(Symbols = stock_list, from = start_date, to = end_date, env = stock_data)
+stock_price=na.omit(stock_data$UL$UL.Adjusted)
+#unil_price
+
+#stock_price = UL.NS$UL.NS.Close # Adjusted Closing Price
+class(stock_price) # xts (Time-Series) Object
+stock_price
+```
+
+```{r}
+# Required Packages
+packages = c('tseries', 'forecast') 
+
+# Load all Packages
+lapply(packages, require, character.only = TRUE) 
+```
+
+```{r}
+# ---------------------------------------------------------------------------------------------
+
+# Forecasting with Time-Series Data (Univariate) : Procedure
+# **********************************************************
+
+# Given an Univariate Time-Series Data, Perform the following Analysis :
+
+# Step 1 : Check for (Weak) Stationarity :: Augmented Dickey-Fuller (ADF) Test
+# If [Data] Stationary, Proceed to Step 2
+# If [Data] Non-Stationary, Use Transformation (such as First/Second/... Difference | Log | ...) to Transform the Data and Check for Stationarity (Step 1)
+
+# Step 2 : Check for Autocorrelation :: Ljung-Box Test 
+# If [Data | Transformed Data] Do Not Have Autocorrelation, proceed to Step 4
+# If [Data | Transformed Data] Has Autocorrelation, Proceed to Step 3
+
+# Step 3 : Model for Autocorrelation :: ARIMA Models
+# Identify AR | MA Order in the [Data | Transformed Data] using PACF | ACF Plots
+# Use ARIMA(p, d, q) with Appropriate AR Order (p-Lags) | d-Degree of Differencing | MA Order (q-Lags) using PACF | ACF Information to Model the [Data | Transformed Data]
+# Test for Autocorrelation in the [Residual Data 1] | If the ARIMA Model is Appropriate : No Autocorrelation in the [Residual Data 1] | If Autocorrelation in [Residual Data 1], Remodel the [Data | Transformed Data]
+# Proceed to Step 4
+
+# Step 4 : Check for Heteroskedasticity :: ARCH LM Test
+# If [Data | Transformed Data] (Step 2) | [Residual Data 1] (Step 3) Do Not Have Heteroskedasticity, Proceed to Step 6
+# If [Data | Transformed Data] (Step 2) | [Residual Data 1] (Step 3) Has Heteroskedasticity, Proceed to Step 5
+
+# Step 5a : Model for Heteroskedasticity in [Data | Transformed Data] (Step 2) :: GARCH Models
+# If Mean of [Data | Transformed Data] (Step 2) != 0 : De-Mean & Square the [Data | Transformed Data] | If Mean of [Data | Transformed Data] (Step 2) = 0 : Square the [Data | Transformed Data] 
+# Identify ARCH | GARCH Order in the using GARCH Function
+# Use GARCH(p,q) with Appropriate ARCH Order (p-Lags) | GARCH Order (q-Lags) to Model the [Data | Transformed Data]
+# Test for Autocorrelation & Heteroskedasticity in the [Residual Data 2] | If the GARCH Model is Appropriate : No Autocorrelation & Heteroskedasticity in the [Residual Data 2] | If Autocorrelation & Heteroskedasticity in [Residual Data 2], Remodel the Squared [Data | Transformed Data]
+# End of Analysis
+
+# Step 5b : Model for Heteroskedasticity in [Residual Data 1] (Step 3) :: GARCH Models
+# Identify ARCH | GARCH Order in the using GARCH Function
+# Use GARCH(p, q) with Appropriate ARCH Order (p-Lags) | GARCH Order (q-Lags) with ARIMA(p, d, q) Model (in Step 3) in the Mean Equation to Model the [Residual Data 1] 
+# Test for Autocorrelation & Heteroskedasticity in the [Residual Data 2] | If the ARIMA+GARCH Model is Appropriate : No Autocorrelation & Heteroskedasticity in the [Residual Data 2] | If Autocorrelation & Heteroskedasticity in [Residual Data 2], Remodel the [Residual Data 1]
+# End of Analysis
+
+# Step 6 : Model White-Noise Data 
+# If the [Data | Transformed Data] is Stationary, Has No Autocorrelation & Heteroskedasticity, the [Data | Transformed Data] is White-Noise Data
+# Model White-Noise Data with Appropriate Probability Distribution
+# End of Analysis
+
+```
+
+```{r}
+# Augmented Dickey-Fuller (ADF) Test for Stationarity with Unilever Data
+# *******************************************************************
+
+adf_test_unil = adf.test(stock_price);adf_test_unil
+# Inference : unil Time-Series is Non-Stationary
+
+```
+
+```{r}
+unil_ds = diff(log(stock_price)); plot(unil_ds) # Unilever (First)return Difference Time-Series
+```
+
+```{r}
+unil_ds=na.omit(unil_ds)
+adf_test_unil_ds = adf.test(unil_ds); adf_test_unil_ds # Inference : Unilever Difference Time-Series is Stationary
+
+```
+
+```{r}
+# Ljung-Box Test for Autocorrelation - Unilever Data
+# ***********************************************
+
+lb_test_unil_ds = Box.test(unil_ds); lb_test_unil_ds # Inference : Unilever Difference (Stationary) Time-Series is Autocorrelated as NULL is rejected and p-value<0.0151 | NULL: No Auto correlation | Alternate: Auto Correlation
+```
+
+```{r}
+# 3.0.3.2. Autocorrelation Function (ACF) | Partial Autocorrelation Function (PACF)
+# *****************************************************************************
+
+acf(stock_price) # ACF of JJ Series
+pacf(stock_price) # PACF of JJ Series
+
+acf(unil_ds) # ACF of Unilever Difference (Stationary) Series
+pacf(unil_ds) # PACF of Unilever Difference (Stationary) Series
+```
+
+```{r}
+# 3.1. Auto Regressive Integrated Moving Average (ARIMA) Models
+# *************************************************************
+
+# 3.1.1. ARIMA Models
+# *******************
+
+# AR (p-Lag) Model : y(t) = c1 + a1*y(t-1) + a2*y(t-2) + ... + ap*y(t-p) + e(t) where e = error == White Noise | AR-1 Model : y(t) = c + a1*y(t-1) + e(t)
+# MA (q-Lag) Model : y(t) = c2 + b1*e(t-1) + b2*e(t-2) + ... + bp*e(t-p) where e = Error == White Noise | MA-1 Model : y(t) = d + b1*e(t-1)
+# ARMA (p, q) Model : y(t) = c + a1*y(t-1) + ... + ap*y(t-p) + b1*e(t-1) + ... + bp*e(t-p) + e(t) | ARMA (1, 1) Model : y(t) = c + a1*y(t-1) + b1*e(t-1) + e(t)
+
+# ARIMA(p, d, q) = AR Order (p-Lags) | d-Degree of Differencing | MA Order (q-Lags)
+
+# Note: The Degree of Differencing for a Time Series data such as Asset Returns is d=0. For a Time Series data such as Asset Prices the Degree of Differencing is usually d=1.
+# Identify AR Order : PACF Cuts Off after p Lags | ACF Tails Off
+# Identify MA Order : ACF Cuts Off after q Lags | PACF Tails Off
+```
+
+```{r}
+arma_pq_unil_ds = auto.arima(unil_ds); arma_pq_unil_ds #p-lag=2, q-lag=2
+```
+
+```{r}
+unil_ds_fpq = forecast(arma_pq_unil_ds, h = 500)
+plot(unil_ds_fpq)
+```
+
+```{r}
+# Ljung-Box Test for Autocorrelation - Model Residuals
+# ****************************************************
+
+lb_test_arma_pq_unil_ds = Box.test(arma_pq_unil_ds$residuals); lb_test_arma_pq_unil_ds
+#p-value>alpha
+```
+
+```{r}
+
+# Test for Volatility Clustering or Heteroskedasticity: Box Test 
+unil_ret_sq = arma_pq_unil_ds$residuals^2 # Residual Variance (Since Mean Returns is approx. 0)
+plot(unil_ret_sq)
+unil_ret_sq_box_test = Box.test(unil_ret_sq, lag = 2) # H0: Return Variance Series is Not Serially Correlated
+unil_ret_sq_box_test # Inference : Return Variance Series is Autocorrelated (Has Volatility Clustering)
+```
+
+```{r}
+# Test for Volatility Clustering or Heteroskedasticity: ARCH Test
+unil_ret_arch_test = ArchTest(arma_pq_unil_ds$residuals^2, lags = 2) # H0: No ARCH Effects
+unil_ret_arch_test # Inference : Return Series is Heteroskedastic (Has Volatility Clustering)
+```
+
+```{r}
+# GARCH Model
+garch_model1 = ugarchspec(variance.model = list(model = 'sGARCH', garchOrder = c(1,1)), mean.model = list(armaOrder = c(0,0), include.mean = TRUE))
+unil_ret_garch1 = ugarchfit(garch_model1, data = arma_pq_unil_ds$residuals^2); unil_ret_garch1
+
+```
+
+```{r}
+# Test for Volatility Clustering or Heteroskedasticity: ARCH Test
+unil_garch_arch_test = ArchTest(arma_pq_unil_ds$residuals, lags = 20) # H0: No ARCH Effects
+unil_garch_arch_test # Inference : Return Series is Heteroskedastic (Has Volatility Clustering)
+#unil_ret_garch1
+```
+
+```{r}
+garch_model2 = ugarchspec(variance.model = list(model = 'sGARCH', garchOrder = c(1,1)), mean.model = list(armaOrder = c(2,2), include.mean = FALSE))
+unil_ret_garch2 = ugarchfit(garch_model2, data = unil_ds); unil_ret_garch2
+
+# GARCH Forecast
+unil_ret_garch_forecast1 = ugarchforecast(unil_ret_garch1, n.ahead = 500); unil_ret_garch_forecast1
+unil_ret_garch_forecast2 = ugarchforecast(unil_ret_garch2, n.ahead = 500); unil_ret_garch_forecast2
+```
+
+```{r}
+plot(unil_ret_garch_forecast2)
+```
+Objective: Analyzing stock of Unilever (2015-19) for its stationarity and collinearity
+
+Stock Data: The output shows the stock "UL" (likely Unilever) with its adjusted prices from January 2, 2015, to December 30, 2019. The data is formatted as an xts (Time-Series) object with the dates as row labels and the adjusted prices as the only column named "UL.Adjusted".
+
+#unil_price
+
+Breakdown of the output:
+
+• The stock symbol is "UL", which typically represents Unilever in financial markets.
+• The data consists of adjusted prices for the stock "UL" over a period of five years, from January 2, 2015, to December 30, 2019.
+• Each row represents a specific date, and the corresponding adjusted price for that date is provided in the "UL.Adjusted" column.
+
+# Augmented Dickey-Fuller (ADF) Test for Stationarity with Unilever Data
+
+Test Result: The Dickey-Fuller test statistic is -2.6837.
+Lag Order: The test was performed with a lag order of 10.
+P-Value: The p-value associated with the test statistic is 0.2889.
+
+The null hypothesis of the ADF test is that the time series data is non-stationary. The alternative hypothesis is that the data is stationary.
+
+Here, the p-value (0.2889) is greater than the common significance level of 0.05. Therefore, we fail to reject the null hypothesis. This suggests that there is not enough evidence to conclude that the stock_price data is stationary based on the ADF test at the 5% significance level.
+
+
+Test Result: The Dickey-Fuller test statistic is -10.948.
+Lag Order: The test was performed with a lag order of 10.
+P-Value: The p-value associated with the test statistic is 0.01.
+
+Interpretation:
+The null hypothesis of the ADF test is that the time series data is non-stationary. The alternative hypothesis is that the data is stationary.
+
+The warning "p-value smaller than printed p-value" suggests that the actual p-value may be smaller than the printed value due to rounding or formatting. In this case, the printed p-value is 0.01. Since this p-value is smaller than the common significance level of 0.05, we reject the null hypothesis. Therefore, based on the ADF test results, we have evidence to conclude that the unil_ds data series is stationary at the 5% significance level.
+
+
+# Auto Regressive Integrated Moving Average (ARIMA) Models
+
+# Ljung-Box Test for Autocorrelation - Unilever Data
+Ljung-Box Test for Autocorrelation - Model Residuals
+Box-Pierce Test: 
+
+Test Result: The test statistic (X-squared) is 12.178.
+Degrees of Freedom (df): The test was performed with 1 degree of freedom.
+P-Value: The p-value associated with the test statistic is 0.0004837.
+
+Interpretation:
+The Box-Pierce test is a statistical test used to assess the goodness of fit of a time series model by testing for autocorrelation in the residuals.
+
+Since the p-value (0.0004837) is less than the significance level (e.g., 0.05), we reject the null hypothesis of no autocorrelation in the residuals. Therefore, there is evidence of autocorrelation in the residuals of the model at the 5% significance level.
+
+
+
+# Test for Volatility Clustering or Heteroskedasticity: Box Test 
+Test Result: The test statistic (X-squared) is 42.82.
+Degrees of Freedom (df): The test was performed with 2 degrees of freedom.
+P-Value: The p-value associated with the test statistic is 5.031e-10 (which is equivalent to 5.031 * 10^-10).
+
+Interpretation:
+The Box-Pierce test is a statistical test used to assess the goodness of fit of a time series model by testing for autocorrelation in the residuals.
+
+Since the p-value (5.031e-10) is significantly less than the significance level (e.g., 0.05), we reject the null hypothesis of no autocorrelation in the residuals. Therefore, there is strong evidence of autocorrelation in the residuals of the model at a high level of significance.
+
+# Test for Volatility Clustering or Heteroskedasticity: ARCH Test
+Test Result: The test statistic (Chi-squared) is 3.8777.
+Degrees of Freedom (df): The test was performed with 2 degrees of freedom.
+P-Value: The p-value associated with the test statistic is 0.1439.
+
+Interpretation:
+The ARCH LM-test is used to assess the presence of Autoregressive Conditional Heteroskedasticity (ARCH) effects in the residuals of a time series model.
+
+Since the p-value (0.1439) is greater than the significance level (e.g., 0.05), we fail to reject the null hypothesis of no ARCH effects. Therefore, there is not enough evidence to conclude that the squared residuals exhibit ARCH effects at the specified significance level.
+
+# GARCH Model
+
+Interpretation:
+Joint Statistic: The joint statistic is 37.9086, indicating the overall significance of the model.
+
+Individual Statistics:
+
+mu: The estimated constant term in the GARCH model is 0.1235.
+omega: This represents the estimated parameter for the variance equation (the constant term) and is 13.7613.
+alpha1: This is the estimated coefficient for the ARCH(1) term in the GARCH model and is 0.3336.
+beta1: This is the estimated coefficient for the GARCH(1) term in the GARCH model and is 0.5365.
+
+Sign Bias Test: This test assesses whether there is a systematic bias in the signs of the residuals of the model.
+
+Results:
+
+Sign Bias: The test statistic for the overall sign bias is 1.0751457, with a corresponding p-value of 0.28251681.
+Negative Sign Bias: The test statistic for the negative sign bias is 1.8856691, with a corresponding p-value of 0.05957108. The asterisk (*) next to the p-value indicates that it is less than some predetermined significance level, often 0.05, suggesting evidence of a negative sign bias at that significance level.
+Positive Sign Bias: The test statistic for the positive sign bias is 0.2258386, with a corresponding p-value of 0.82136381.
+Joint Effect: The joint effect test statistic is 3.9441880, with a corresponding p-value of 0.26755423.
+The p-values associated with the sign bias tests indicate the probability of observing the given test statistics under the null hypothesis of no sign bias. Lower p-values indicate stronger evidence against the null hypothesis.
+
+In this case:
+
+There is no strong evidence of overall sign bias, as the p-value for the sign bias test is greater than the typical significance level of 0.05.
+There is some evidence of negative sign bias, as indicated by the asterisk (*) next to the p-value, although it does not reach conventional levels of significance.
+There is no strong evidence of positive sign bias.
+The joint effect test assesses the overall impact of sign bias and its significance.
+
